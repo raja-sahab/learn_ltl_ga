@@ -1,15 +1,20 @@
 use learn_ltl::*;
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::Path;
-use itertools::Itertools;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{Write};
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[clap(short = 's', long, default_value_t = 3)]
+    size: usize, //taking command line argument for size
+}
 
 fn main() {
+    let args = Args::parse();
+    println!("size of the formula is {}!", args.size);
 
+    let size = args.size; //size of the formula
     const N: usize = 5; // number of propositional variables
-    let size = 3; // size of the formula
     let vars: &[Idx] = &[1, 2, 3]; // list of propositional variables
 
     // start a new vector
