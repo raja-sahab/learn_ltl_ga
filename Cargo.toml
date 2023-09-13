@@ -19,6 +19,10 @@ path = "src/sampler/main.rs"
 name = "simulator"
 path = "src/simulator/main.rs"
 
+[[bin]]
+name = "sample_generator"
+path = "src/sample_generator/main.rs"
+
 [[bench]]
 name = "sample"
 harness = false
