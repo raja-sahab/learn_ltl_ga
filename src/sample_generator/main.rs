@@ -375,11 +375,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let sorted_filename = "sorted_formulas.txt";
     //save_formulas_to_file(&sorted_formulas, sorted_filename)?;
 
-    // Extract the top 80% sorted formulas
+    // Extract the top 70% sorted formulas
     let top_80_percent_index = (formula_fitness.len() as f32 * 0.7).ceil() as usize;
     let sorted_formulas: Vec<SyntaxTree> = formula_fitness
         .iter()
-        .take(top_80_percent_index)
+        .take(top_70_percent_index)
         .map(|(formula, _)| formula.clone())
         .collect();
 
