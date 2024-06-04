@@ -30,10 +30,27 @@ struct Args {
 
 const N: usize = 2; // number of propositional variables
 
-fn calculate_fitness (positive_count: usize, negative_count: usize) -> i32 {
+fn calculate_formula_size(tree: &SyntaxTree) -> usize {
+    match tree {
+        SyntaxTree::Atom(_) => 1,
+        SyntaxTree::Not(subtree) => 1 + calculate_formula_size(subtree),
+        SyntaxTree::Next(subtree) => 1 + calculate_formula_size(subtree),
+        SyntaxTree::Globally(subtree) => 1 + calculate_formula_size(subtree),
+        SyntaxTree::Finally(subtree) => 1 + calculate_formula_size(subtree),
+        SyntaxTree::And(left, right)
+        | SyntaxTree::Or(left, right)
+        | SyntaxTree::Implies(left, right)
+        | SyntaxTree::Until(left, right) => 1 + calculate_formula_size(left) + calculate_formula_size(right),
+    }
+}
+
+fn calculate_fitness(positive_count: usize, negative_count: usize, size: usize) -> i32 {
     // Calculate the net gain in positive traces and net loss in negative traces
     let net_fitness = (positive_count as i32) - (negative_count as i32);
-    net_fitness
+    // Introduce a penalty for the size of the formula
+    let size_penalty = size as i32;
+    // Calculate the final fitness by subtracting the size penalty
+    net_fitness - size_penalty
 }
 
 fn evaluate_formulas(
@@ -49,7 +66,7 @@ fn evaluate_formulas(
         let mut positive_count = 0;
         let mut negative_count = 0;
 
-        for content in contents.chunks(10280) {
+        for content in contents.chunks(10000000) {
             // Deserialize the content
             if let Ok(deserialized_sample) = ron::de::from_bytes::<Sample<N>>(content) {
                 // Count the number of satisfied positive traces
@@ -118,7 +135,7 @@ fn crossover(parent1: &SyntaxTree, parent2: &SyntaxTree) -> Option<(SyntaxTree, 
     if let (Some(branch1_p1), Some(branch2_p1)) = get_branches(parent1) {
         if let (Some(branch1_p2), Some(branch2_p2)) = get_branches(parent2) {
 
-            println!("Formula is {} {}", parent1, parent2);
+            // println!("Formula is {} {}", parent1, parent2);
 
             let mut offspring1 = None;
             let mut offspring2 = None;
@@ -263,6 +280,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("propositional variables are {:?}", vars);
     println!("Total number of formulas generated: {}", total_formulas);
 
+    let mut rng = rand::thread_rng();
+
     for iteration in 0..iterations {
         println!("\nIteration {}", iteration + 1);
     let total_formulas = formulas.len();
@@ -275,18 +294,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut combined_formulas = formulas.clone();
 
     // Assuming you have some parent1, parent2, and crossover_point values
-    let mut parent1; // Accessing the first formula as parent1 for example
+    // let mut parent1; // Accessing the first formula as parent1 for example
     // println!("size of the parent1 is {}", parent1);
-    let mut parent2; // Accessing the second formula as parent2 for example
+    // let mut parent2; // Accessing the second formula as parent2 for example
     // println!("size of the parent2 is {}", parent2);
-    let crossover_point = 5; // Example crossover point
+    // let crossover_point = 5; // Example crossover point
 
     let mut crossoverFormulas: Vec<SyntaxTree> = Vec::new();
 
     for i in 1..total_formulas {
+
+        let parent1_index = rng.gen_range(0..total_formulas);
+        let parent2_index = rng.gen_range(0..total_formulas);
+
+        let parent1 = &formulas[parent1_index];
+        let parent2 = &formulas[parent2_index];
         // println!("Number: {}", i);
-        parent1 = &formulas[i - 1];
-        parent2 = &formulas[i];
+        // parent1 = &formulas[i - 1];
+        // parent2 = &formulas[i];
         // println!(" parents are {} {}", parent1, parent2);
         //println!(" PARENTTTTTTTTTTTTTTTTT 1111111111111111111 isssssssssssss {}", parent1);
         if let Some((mut offspring1, mut offspring2)) = crossover(parent1, parent2) {
@@ -340,7 +365,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, formula) in combined_formulas.iter().enumerate() {
         let (positive_count, negative_count) = evaluate_formulas(&content, multithread, &[formula.clone()], &sample)
             .expect("Evaluation failed");
-        let fitness = calculate_fitness(positive_count, negative_count);
+        let size = calculate_formula_size(formula);
+        let fitness = calculate_fitness(positive_count, negative_count, size);
         formula_fitness.push((formula.clone(), fitness));
 
         /* Print the evaluation results for the current formula
@@ -353,6 +379,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Evaluate formulas
     let (positive_count, negative_count) = evaluate_formulas(&content, multithread, &formulas, &sample)
         .expect("Evaluation failed");
+
+    // Calculate and print the size of each formula in combined_formulas
+    for formula in &combined_formulas {
+        let size = calculate_formula_size(formula);
+        // println!("Formula: {:?}, Size: {}", formula, size);
+    }
 
     // Sort the formulas based on fitness score in descending order
     formula_fitness.sort_by(|a, b| b.1.cmp(&a.1));
@@ -372,17 +404,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sorted_formulas: Vec<SyntaxTree> = formula_fitness.iter().map(|(formula, _)| formula.clone()).collect();
 
     // Save the sorted formulas to a new file
-    //let sorted_filename = "sorted_formulas.txt";
-    //save_formulas_to_file(&sorted_formulas, sorted_filename)?;
+    let sorted_filename = "sorted_formulas.txt";
+    save_formulas_to_file(&sorted_formulas, sorted_filename)?;
 
-    // Extract the top 70% sorted formulas
-    let top_80_percent_index = (formula_fitness.len() as f32 * 0.7).ceil() as usize;
+    // Extract the top 100 sorted formulas
+    let top_n = 100;
     let sorted_formulas: Vec<SyntaxTree> = formula_fitness
         .iter()
-        .take(top_70_percent_index)
+        .take(top_n.min(formula_fitness.len()))
         .map(|(formula, _)| formula.clone())
         .collect();
-
 
     println!("Iteration {} completed", iteration + 1);
 
